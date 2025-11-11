@@ -1,0 +1,132 @@
+// Agentic Test Platform - Test Results Database Schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Test execution run
+model TestRun {
+  id                String      @id @default(cuid())
+  platform          String      // "lumina", "readworthy", etc.
+  testType          String      // "parallel", "serial", "stress"
+  agentCount        Int         // Number of agents in this run
+  totalDuration     Int         // Total milliseconds
+  successRate       Decimal     @db.Decimal(5, 2) // 0.00 to 100.00
+  avgResponseTime   Int?        // Average response time in ms
+  throughput        Decimal?    @db.Decimal(10, 2) // Requests per second
+  errorCount        Int         @default(0)
+  startedAt         DateTime    @default(now())
+  completedAt       DateTime?
+  status            String      @default("RUNNING") // RUNNING, COMPLETED, FAILED
+  configuration     Json        // Test configuration
+  results           Json?       // Aggregated results
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  agents            TestAgent[]
+  metrics           TestMetric[]
+  errors            TestError[]
+
+  @@index([platform, startedAt])
+  @@index([status])
+}
+
+// Individual test agent execution
+model TestAgent {
+  id              String      @id @default(cuid())
+  testRunId       String
+  agentName       String      // "BetaUser_1", "BetaUser_2", etc.
+  personaType     String      // "BEGINNER", "INTERMEDIATE", "EXPERT"
+  status          String      @default("PENDING") // PENDING, RUNNING, COMPLETED, FAILED
+  startedAt       DateTime?
+  completedAt     DateTime?
+  duration        Int?        // Milliseconds
+  stepsCompleted  Int         @default(0)
+  stepsTotal      Int
+  successRate     Decimal     @db.Decimal(5, 2)
+  errors          Json[]      // Array of error objects
+  decisions       Json[]      // Array of decision logs
+  actions         Json[]      // Array of action logs
+  metrics         Json        // Agent-specific metrics
+
+  testRun         TestRun     @relation(fields: [testRunId], references: [id], onDelete: Cascade)
+
+  @@index([testRunId, status])
+  @@index([personaType])
+}
+
+// Performance metrics collected during test
+model TestMetric {
+  id              String      @id @default(cuid())
+  testRunId       String
+  metricType      String      // "RESPONSE_TIME", "THROUGHPUT", "ERROR_RATE", "CPU", "MEMORY"
+  value           Decimal     @db.Decimal(12, 4)
+  unit            String      // "ms", "req/s", "%", "MB"
+  timestamp       DateTime    @default(now())
+  metadata        Json?       // Additional metric data
+
+  testRun         TestRun     @relation(fields: [testRunId], references: [id], onDelete: Cascade)
+
+  @@index([testRunId, metricType, timestamp])
+}
+
+// Errors encountered during test execution
+model TestError {
+  id              String      @id @default(cuid())
+  testRunId       String
+  agentName       String?     // Optional - which agent encountered the error
+  errorType       String      // "API_ERROR", "TIMEOUT", "VALIDATION", "NETWORK", "UNEXPECTED"
+  severity        String      // "LOW", "MEDIUM", "HIGH", "CRITICAL"
+  message         String
+  stackTrace      String?
+  endpoint        String?     // API endpoint that failed
+  statusCode      Int?        // HTTP status code
+  context         Json?       // Additional context
+  timestamp       DateTime    @default(now())
+
+  testRun         TestRun     @relation(fields: [testRunId], references: [id], onDelete: Cascade)
+
+  @@index([testRunId, errorType])
+  @@index([severity, timestamp])
+}
+
+// Test scenarios/flows
+model TestScenario {
+  id              String      @id @default(cuid())
+  platform        String      // "lumina", "readworthy"
+  name            String      // "complete_onboarding", "generate_content"
+  description     String
+  steps           Json        // Array of test steps
+  expectedDuration Int        // Expected milliseconds
+  priority        Int         @default(1) // 1=HIGH, 2=MEDIUM, 3=LOW
+  tags            String[]    // ["authentication", "content", "social"]
+  isActive        Boolean     @default(true)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@unique([platform, name])
+  @@index([platform, isActive])
+}
+
+// User personas for realistic testing
+model TestPersona {
+  id              String      @id @default(cuid())
+  name            String      // "Novice Author", "Experienced Marketer"
+  type            String      // "BEGINNER", "INTERMEDIATE", "EXPERT"
+  characteristics Json        // Persona traits and behaviors
+  goals           String[]    // What they're trying to achieve
+  painPoints      String[]    // Common frustrations
+  decisionPatterns Json       // How they make decisions
+  platform        String      // "lumina", "all"
+  isActive        Boolean     @default(true)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@unique([name])
+  @@index([type, platform])
+}
