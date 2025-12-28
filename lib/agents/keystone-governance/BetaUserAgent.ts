@@ -1,4 +1,4 @@
-// Keystone-Governance Beta User Agent - Simulates board member/governance professional behavior
+// Keystone-Governance Beta User Agent - Simulates compliance officer/incident manager behavior
 
 import { TestAgent } from '../../core/TestAgent';
 import { UserPersona, TestConfig, TestResult, TestStatus } from '../../core/types';
@@ -6,19 +6,21 @@ import { UserPersona, TestConfig, TestResult, TestStatus } from '../../core/type
 interface KeystoneUser {
   id: string;
   email: string;
-  name: string;
+  first_name: string;
   role: string;
+  org_id: string;
 }
 
-interface Board {
+interface Incident {
   id: string;
-  name: string;
+  incident_number: string;
+  title: string;
 }
 
 export class KeystoneGovernanceBetaUserAgent extends TestAgent {
-  private sessionCookie?: string;
+  private accessToken?: string;
   private user?: KeystoneUser;
-  private boards: Board[] = [];
+  private incidents: Incident[] = [];
 
   constructor(agentName: string, persona: UserPersona, config: TestConfig) {
     super(agentName, persona, config);
@@ -30,162 +32,124 @@ export class KeystoneGovernanceBetaUserAgent extends TestAgent {
     this.status = TestStatus.RUNNING;
 
     try {
-      await this.executeAction('signup_or_login', async () => await this.signupOrLogin(), true);
+      await this.executeAction('login', async () => await this.login(), true);
       await this.humanDelay();
-
-      await this.executeAction('create_board', async () => await this.createBoard(), true);
+      await this.executeAction('view_dashboard', async () => await this.viewDashboard(), true);
       await this.humanDelay();
-
-      await this.executeAction('schedule_meeting', async () => await this.scheduleMeeting(), true);
+      await this.executeAction('create_incident', async () => await this.createIncident(), true);
       await this.humanDelay();
-
-      await this.executeAction('create_agenda', async () => await this.createAgenda(), true);
+      await this.executeAction('list_incidents', async () => await this.listIncidents(), true);
       await this.humanDelay();
-
-      await this.executeAction('upload_documents', async () => await this.uploadDocuments(), true);
+      await this.executeAction('view_incident', async () => await this.viewIncident(), true);
       await this.humanDelay();
-
-      await this.executeAction('create_motion', async () => await this.createMotion(), true);
+      await this.executeAction('list_policies', async () => await this.listPolicies(), true);
       await this.humanDelay();
-
-      await this.executeAction('record_vote', async () => await this.recordVote(), true);
+      await this.executeAction('list_documents', async () => await this.listDocuments(), true);
       await this.humanDelay();
-
-      await this.executeAction('generate_minutes', async () => await this.generateMinutes(), true);
+      await this.executeAction('view_training', async () => await this.viewTraining(), true);
       await this.humanDelay();
-
-      await this.executeAction('track_compliance', async () => await this.trackCompliance(), true);
+      await this.executeAction('check_compliance', async () => await this.checkCompliance(), true);
       await this.humanDelay();
+      await this.executeAction('view_notifications', async () => await this.viewNotifications(), true);
 
-      await this.executeAction('view_governance_analytics', async () => await this.viewGovernanceAnalytics(), true);
-
-      return this.generateResult(TestStatus.COMPLETED, `Successfully completed Keystone-Governance test flow`);
+      return this.generateResult(TestStatus.COMPLETED, 'Successfully completed Keystone-Governance test flow');
     } catch (error: any) {
       this.logger.error('Test flow failed', { error: error.message });
-      return this.generateResult(TestStatus.FAILED, `Test flow failed: ${error.message}`);
+      return this.generateResult(TestStatus.FAILED, 'Test flow failed: ' + error.message);
     }
   }
 
   async generateRealisticContent(contentType: string): Promise<any> {
-    const prompt = `Generate realistic ${contentType} for a ${this.persona.type} level board member/governance professional.`;
     try {
       const response = await this.anthropic.messages.create({
         model: 'claude-3-5-sonnet-20241022',
-        max_tokens: 500,
-        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 300,
+        messages: [{ role: 'user', content: 'Generate a short ' + contentType + ' for compliance. Return only the text.' }],
       });
       const content = response.content[0];
-      return content.type === 'text' ? content.text : '';
-    } catch (error: any) {
-      return this.getFallbackContent(contentType);
+      return content.type === 'text' ? content.text : this.getFallbackContent(contentType);
+    } catch { return this.getFallbackContent(contentType); }
+  }
+
+  private async login(): Promise<void> {
+    const response = await this.http.post('/api/v1/auth/login', {
+      email: 'admin@demo-keystone.com',
+      password: 'DemoAdmin123\!',
+    });
+    this.accessToken = response.data.access_token;
+    this.user = response.data.user;
+    this.http.defaults.headers.Authorization = 'Bearer ' + this.accessToken;
+    this.logger.info('Login successful', { userId: this.user?.id });
+  }
+
+  private async viewDashboard(): Promise<void> {
+    const [inc, usr] = await Promise.all([
+      this.http.get('/api/v1/dashboard/incidents'),
+      this.http.get('/api/v1/dashboard/users'),
+    ]);
+    this.logger.info('Dashboard viewed', { incidents: inc.data.total?.value || 0, users: usr.data.total?.value || 0 });
+  }
+
+  private async createIncident(): Promise<void> {
+    const title = await this.generateRealisticContent('incident title');
+    const response = await this.http.post('/api/v1/incidents', {
+      title: typeof title === 'string' ? title.substring(0, 100) : 'Security Incident',
+      description: 'Potential breach detected',
+      incident_type: 'security',
+      severity: 'medium',
+      priority: 'medium',
+      incident_date: new Date().toISOString(),
+      location: 'Main Office',
+      confidential: false,
+    });
+    this.incidents.push({ id: response.data.id, incident_number: response.data.incident_number, title: response.data.title });
+    this.logger.info('Incident created', { id: response.data.id });
+  }
+
+  private async listIncidents(): Promise<void> {
+    const response = await this.http.get('/api/v1/incidents', { params: { page: 1, limit: 20 } });
+    this.logger.info('Incidents listed', { count: response.data.data?.length || 0 });
+  }
+
+  private async viewIncident(): Promise<void> {
+    if (this.incidents.length === 0) {
+      const list = await this.http.get('/api/v1/incidents', { params: { page: 1, limit: 1 } });
+      if (list.data.data?.length > 0) this.incidents.push(list.data.data[0]);
+      else { this.logger.info('No incidents'); return; }
     }
+    const response = await this.http.get('/api/v1/incidents/' + this.incidents[0].id);
+    this.logger.info('Incident viewed', { number: response.data.incident_number });
   }
 
-  private async signupOrLogin(): Promise<void> {
-    const email = `${this.agentName.toLowerCase()}@test-keystone.local`;
-    const password = 'TestBoard123!'; // pragma: allowlist secret
-
-    try {
-      const signupResponse = await this.http.post('/api/auth/signup', {
-        email, password, name: this.persona.name, role: 'BOARD_MEMBER',
-      });
-      this.user = signupResponse.data.user;
-      this.sessionCookie = signupResponse.headers['set-cookie']?.[0];
-    } catch (error: any) {
-      if (error.response?.status === 409) {
-        const loginResponse = await this.http.post('/api/auth/signin', { email, password });
-        this.user = loginResponse.data.user;
-        this.sessionCookie = loginResponse.headers['set-cookie']?.[0];
-      } else throw error;
-    }
-
-    if (this.sessionCookie) this.http.defaults.headers.Cookie = this.sessionCookie;
+  private async listPolicies(): Promise<void> {
+    const response = await this.http.get('/api/v1/policies', { params: { page: 1, limit: 20 } });
+    this.logger.info('Policies listed', { count: response.data.data?.length || 0 });
   }
 
-  private async createBoard(): Promise<void> {
-    const boardName = await this.generateRealisticContent('board_name');
-    const response = await this.http.post('/api/boards', {
-      name: typeof boardName === 'string' ? boardName : `Test Board ${Date.now()}`,
-      type: 'CORPORATE',
-    });
-    this.boards.push(response.data.board);
-    this.logger.info('Board created', { boardId: response.data.board.id });
+  private async listDocuments(): Promise<void> {
+    const response = await this.http.get('/api/v1/documents', { params: { page: 1, limit: 20 } });
+    this.logger.info('Documents listed', { count: response.data.data?.length || 0 });
   }
 
-  private async scheduleMeeting(): Promise<void> {
-    if (this.boards.length === 0) throw new Error('No boards');
-    await this.http.post('/api/meetings', {
-      boardId: this.boards[0].id,
-      datetime: new Date(Date.now() + 86400000 * 7).toISOString(),
-      type: 'REGULAR',
-    });
-    this.logger.info('Meeting scheduled');
+  private async viewTraining(): Promise<void> {
+    const response = await this.http.get('/api/v1/training/modules', { params: { page: 1, limit: 20 } });
+    this.logger.info('Training viewed', { count: response.data.data?.length || 0 });
   }
 
-  private async createAgenda(): Promise<void> {
-    if (this.boards.length === 0) throw new Error('No boards');
-    const agendaItems = await this.generateRealisticContent('agenda_items');
-    await this.http.post('/api/agendas', {
-      boardId: this.boards[0].id,
-      items: typeof agendaItems === 'string' ? [agendaItems] : ['Review financials', 'Approve strategy'],
-    });
-    this.logger.info('Agenda created');
+  private async checkCompliance(): Promise<void> {
+    const response = await this.http.get('/api/v1/dashboard/training');
+    this.logger.info('Compliance checked', { score: response.data.completion_rate || 'N/A' });
   }
 
-  private async uploadDocuments(): Promise<void> {
-    if (this.boards.length === 0) throw new Error('No boards');
-    await this.http.post('/api/documents', {
-      boardId: this.boards[0].id,
-      title: 'Board Materials',
-      type: 'MEETING_PACK',
-    });
-    this.logger.info('Documents uploaded');
-  }
-
-  private async createMotion(): Promise<void> {
-    if (this.boards.length === 0) throw new Error('No boards');
-    const motionText = await this.generateRealisticContent('motion_text');
-    await this.http.post('/api/motions', {
-      boardId: this.boards[0].id,
-      text: typeof motionText === 'string' ? motionText : 'Motion to approve budget',
-    });
-    this.logger.info('Motion created');
-  }
-
-  private async recordVote(): Promise<void> {
-    if (this.boards.length === 0) throw new Error('No boards');
-    await this.http.post('/api/votes', {
-      boardId: this.boards[0].id,
-      vote: 'FOR',
-    });
-    this.logger.info('Vote recorded');
-  }
-
-  private async generateMinutes(): Promise<void> {
-    if (this.boards.length === 0) throw new Error('No boards');
-    await this.http.post('/api/minutes/generate', {
-      boardId: this.boards[0].id,
-    });
-    this.logger.info('Minutes generated');
-  }
-
-  private async trackCompliance(): Promise<void> {
-    if (this.boards.length === 0) throw new Error('No boards');
-    await this.http.get(`/api/compliance?boardId=${this.boards[0].id}`);
-    this.logger.info('Compliance tracked');
-  }
-
-  private async viewGovernanceAnalytics(): Promise<void> {
-    const response = await this.http.get('/api/analytics/governance');
-    this.logger.info('Governance analytics viewed', { meetingsCount: response.data.total || 0 });
+  private async viewNotifications(): Promise<void> {
+    const [count, list] = await Promise.all([
+      this.http.get('/api/v1/notifications/count'),
+      this.http.get('/api/v1/notifications', { params: { limit: 10, page: 1 } }),
+    ]);
+    this.logger.info('Notifications viewed', { unread: count.data.count || 0 });
   }
 
   private getFallbackContent(contentType: string): string {
-    const fallbacks: Record<string, string> = {
-      board_name: 'Executive Board',
-      agenda_items: 'Strategic Planning',
-      motion_text: 'Approval of Annual Budget',
-    };
-    return fallbacks[contentType] || 'Generated governance content';
+    return contentType.includes('title') ? 'Security Policy Violation' : 'Compliance content';
   }
 }

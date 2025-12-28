@@ -38,7 +38,11 @@
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "build": "tsc",
-    "dev": "ts-node-dev --respawn --transpile-only scripts/run-lumina-tests.ts"
+    "dev": "ts-node-dev --respawn --transpile-only scripts/run-lumina-tests.ts",
+    "test": "jest",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint . --ext .js,.ts,.tsx",
+    "lint:fix": "eslint . --ext .js,.ts,.tsx --fix"
   },
   "keywords": [
     "testing",

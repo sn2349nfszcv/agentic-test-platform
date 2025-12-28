@@ -1,0 +1,39 @@
+# Agentic-Test-Platform CI
+# Uses APEXDEV reusable workflow templates
+
+name: CI
+
+on:
+  push:
+    branches: [main, master, develop]
+    paths:
+      - 'platforms/DEVELOPMENT/Agentic-Test-Platform/**'
+  pull_request:
+    branches: [main, master]
+    paths:
+      - 'platforms/DEVELOPMENT/Agentic-Test-Platform/**'
+  workflow_dispatch:
+
+jobs:
+  ci-node:
+    uses: ./.github/workflows/templates/ci-node-nextjs.yml
+    with:
+      working-directory: 'platforms/DEVELOPMENT/Agentic-Test-Platform'
+      node-version: '20'
+      is-nextjs: false
+      coverage-threshold: 60
+      run-security: true
+
+  ci-python:
+    uses: ./.github/workflows/templates/ci-python.yml
+    with:
+      working-directory: 'platforms/DEVELOPMENT/Agentic-Test-Platform'
+      python-version: '3.11'
+      coverage-threshold: 60
+      run-security: true
+
+  security:
+    uses: ./.github/workflows/templates/security-platform.yml
+    with:
+      working-directory: 'platforms/DEVELOPMENT/Agentic-Test-Platform'
+      platform-type: 'mixed'

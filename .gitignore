@@ -1,60 +1,53 @@
-# Dependencies
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Build output
-dist/
-build/
-*.tsbuildinfo
-
-# Environment variables
-.env
-.env.local
-.env.*.local
-
-# Test results and reports
-test-results/
-*.log
-logs/
-
-# Database
-*.db
-*.db-journal
-*.sqlite
 *.sqlite3
-prisma/dev.db
-
-# IDE
-.vscode/
-.idea/
-*.swp
 *.swo
-*~
-.DS_Store
-
-# OS
-Thumbs.db
-Desktop.ini
-
-# TypeScript
-*.tsbuildinfo
-
-# Coverage
-coverage/
-.nyc_output/
-
-# Temporary files
-tmp/
-temp/
-*.tmp
-
-# Debug
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+# OS
+npm-debug.log*
+*.swp
+.DS_Store
+.nyc_output/
+!.yarn/patches
+*.sqlite
+coverage/
+.env.*.local
+# Database
+.yarn/*
+.vscode/
+build/
+logs/
+# Temporary files
+!.yarn/plugins
+# Test results and reports
+.idea/
+*.tmp
+dist/
+*.db-journal
+yarn-debug.log*
+tmp/
+Desktop.ini
+# IDE
+# TypeScript
+# Environment variables
+*.db
+node_modules/
+Thumbs.db
+.env.local
+*~
+*.log
+# Build output
+prisma/dev.db
+*.tsbuildinfo
+# Debug
+yarn-error.log*
+test-results/
+# Coverage
+.pnp.*
+# Dependencies
+.env
+temp/
+
+# Security - Added by Secret Remediation Pipeline
+*.pem
+*.key
